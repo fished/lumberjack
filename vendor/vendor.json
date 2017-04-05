@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "CcBrJWyhPatcBdu7L5+SQvdhm4A=",
+			"path": "github.com/pressly/chi",
+			"revision": "157587f33c258f3590967dfc7be2e75c0aa1cdf3",
+			"revisionTime": "2017-04-02T19:47:56Z"
+		}
+	],
+	"rootPath": "github.com/fished/lumberjack"
+}
