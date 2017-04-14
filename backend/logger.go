@@ -36,7 +36,7 @@ func newLogger(dbPath string, parser *regexp.Regexp, tsParser TimestampParser) (
 		}
 	}
 
-	for _, name := range re.SubexpNames() {
+	for _, name := range parser.SubexpNames() {
 		if !hasIndex(logs, name) {
 			if err := logs.Index([]string{"message", "keys", name}); err != nil {
 				return nil, err
