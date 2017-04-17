@@ -5,10 +5,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/fished/lumberjack/backend"
-	"github.com/julienschmidt/httprouter"
 	"io/ioutil"
 	"regexp"
+
+	"github.com/fished/lumberjack/backend"
+	"github.com/julienschmidt/httprouter"
 )
 
 var recorder *backend.Recorder
@@ -18,9 +19,8 @@ func postMessageHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 	r.ParseForm()
 
 	var body string
-	bodyReader := r.Body()
-	defer bodyReader.Close()
-	if b, err := ioutil.ReadAll(bodyReader); err == nil {
+	defer r.Body.Close()
+	if b, err := ioutil.ReadAll(r.Body); err == nil {
 		body = string(b)
 	} else {
 		errorString := fmt.Sprintf("ERROR: Couldn't read request body: %s", err)
@@ -28,12 +28,18 @@ func postMessageHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Par
 		http.Error(w, errorString, http.StatusBadRequest)
 	}
 
+	var msg *backend.Message
+	var err error
 	parser := parsers["default"]
-	msg := parser(body,
+	if msg, err = parser.Parse(body,
 		backend.MessageKey("source", r.FormValue("source")),
-		backend.MessageKey("instance", r.FormValue("instance")))
+		backend.MessageKey("instance", r.FormValue("instance"))); err != nil {
+		errorString := fmt.Sprintf("ERROR: Couldn't read parse message: %s", err)
+		log.Println(errorString)
+		http.Error(w, errorString, http.StatusBadRequest)
+	}
 
-	if err := recorder(msg); err != nil {
+	if err := recorder.Record(msg); err != nil {
 		errorString := fmt.Sprintf("ERROR: Couldn't record msg: %s", err)
 		log.Println(errorString)
 		http.Error(w, errorString, http.StatusInternalServerError)
@@ -47,6 +53,7 @@ func init() {
 func main() {
 	var err error
 
+	log.Print("Setting up service...")
 	// Setup the parsers.  TODO: Should be configurable.
 	parsers = make(map[string]*backend.MessageParser)
 	parsers["default"] = backend.NewStringMessageParser(
@@ -57,15 +64,18 @@ func main() {
 
 	// Generate the recorder as a global.  TODO: Should be configurable.
 	var indexes []string
-	for _, i := range(parsers) {
-		indexes = append(indexes, i...)
+	for _, i := range parsers {
+		indexes = append(indexes, i.IndexedKeys...)
 	}
-	//TODO: Shoudl be configurable.
+
+	//TODO: Should be configurable.
 	recorder, err = backend.NewRecorder("/tmp/lumberjack", indexes)
 	if err != nil {
 		log.Fatalf("Failed to initializer recorder: %s", err)
 	}
+	log.Println("done.")
 
+	log.Println("Serving.")
 	router := httprouter.New()
 	router.POST("/log/:source", postMessageHandler)
 
